@@ -547,3 +547,39 @@ ul { list-style: none; }
   .nav-link span { display: none; }
   .nav-link { padding: 0 8px; }
 }
+
+/* ── Reaction picker ──────────────────────────────────────────────────────── */
+.reaction-picker {
+  position: fixed;
+  z-index: 600;
+  background: #fff;
+  border-radius: 40px;
+  padding: 6px 10px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.22);
+  display: flex;
+  gap: 4px;
+  animation: pickerIn 0.12s ease-out;
+}
+.reaction-picker.hidden { display: none; }
+@keyframes pickerIn {
+  from { transform: scale(0.7) translateY(6px); opacity: 0; }
+  to   { transform: scale(1)   translateY(0);   opacity: 1; }
+}
+.reaction-picker button {
+  font-size: 26px;
+  padding: 4px 6px;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  line-height: 1;
+  transition: transform 0.12s;
+}
+.reaction-picker button:hover { transform: scale(1.35) translateY(-4px); }
+
+/* Like button in emoji mode */
+.like-btn .reaction-emoji-label { display: none; font-size: 13px; font-weight: 600; }
+.like-btn .reaction-text-label  { }
+.like-btn.has-emoji .reaction-svg         { display: none; }
+.like-btn.has-emoji .reaction-emoji-label { display: inline; }
+.like-btn.has-emoji .reaction-text-label  { display: none; }

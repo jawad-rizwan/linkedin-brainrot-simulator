@@ -75,6 +75,122 @@
     }
   ];
 
+  // ── Reaction map ─────────────────────────────────────────────────────────
+
+  const REACTION_MAP = {
+    like:       { emoji: '👍', label: 'Like',       color: '#0a66c2' },
+    celebrate:  { emoji: '🎉', label: 'Celebrate',  color: '#44712e' },
+    love:       { emoji: '❤️',  label: 'Love',        color: '#b24020' },
+    insightful: { emoji: '💡', label: 'Insightful',  color: '#915907' },
+    curious:    { emoji: '🤔', label: 'Curious',     color: '#7d5af1' },
+  };
+
+  // ── Web Audio engine ──────────────────────────────────────────────────────
+
+  let audioCtx = null;
+  function initAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+
+  function playTone(freq, duration, type = 'sine', volume = 0.25) {
+    initAudio();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + duration);
+  }
+
+  function playReactionSound(key) {
+    const t = audioCtx ? audioCtx.currentTime : 0;
+    switch (key) {
+      case 'like':
+        playTone(440, 0.08); setTimeout(() => playTone(660, 0.12), 80); break;
+      case 'celebrate':
+        playTone(523, 0.07); setTimeout(() => playTone(659, 0.07), 80); setTimeout(() => playTone(784, 0.15), 160); break;
+      case 'love':
+        playTone(392, 0.3, 'sine', 0.2); break;
+      case 'insightful':
+        playTone(528, 0.25, 'sine', 0.22); break;
+      case 'curious':
+        playTone(300, 0.15); setTimeout(() => playTone(340, 0.2), 60); break;
+    }
+  }
+
+  function playConnectSound() {
+    initAudio();
+    playTone(440, 0.1); setTimeout(() => playTone(523, 0.1), 110); setTimeout(() => playTone(659, 0.2), 220);
+  }
+
+  // ── Reaction picker ───────────────────────────────────────────────────────
+
+  const picker = document.getElementById('reaction-picker');
+  let pickerCurrentPost = null;
+  let pickerCurrentBtn = null;
+  let pickerHideTimer = null;
+
+  function showPicker(likeBtn, post) {
+    clearTimeout(pickerHideTimer);
+    pickerCurrentPost = post;
+    pickerCurrentBtn = likeBtn;
+    const rect = likeBtn.getBoundingClientRect();
+    picker.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+    picker.style.left = rect.left + 'px';
+    picker.classList.remove('hidden');
+  }
+
+  function hidePicker() {
+    pickerHideTimer = setTimeout(() => picker.classList.add('hidden'), 150);
+  }
+
+  function selectReaction(key, post, likeBtn) {
+    const { emoji, label, color } = REACTION_MAP[key];
+    const emojiSpan = likeBtn.querySelector('.reaction-emoji-label');
+    const textSpan  = likeBtn.querySelector('.reaction-text-label');
+
+    if (post._userReaction === key) {
+      // Toggle off
+      post.reactions[key] = Math.max(0, post.reactions[key] - 1);
+      post._userReaction = null;
+      likeBtn.classList.remove('active', 'has-emoji');
+      likeBtn.style.color = '';
+      emojiSpan.textContent = '';
+      textSpan.textContent = 'Like';
+    } else {
+      if (post._userReaction) {
+        post.reactions[post._userReaction] = Math.max(0, post.reactions[post._userReaction] - 1);
+      }
+      post.reactions[key] = (post.reactions[key] || 0) + 1;
+      post._userReaction = key;
+      likeBtn.classList.add('active', 'has-emoji');
+      likeBtn.style.color = color;
+      emojiSpan.textContent = emoji + '\u00A0' + label;
+      textSpan.textContent = '';
+    }
+
+    const summaryEl = likeBtn.closest('.post-card').querySelector('.reactions-count');
+    summaryEl.innerHTML = `<span class="reaction-emojis">${topReactionEmojis(post.reactions)}</span>${formatCount(totalReactions(post.reactions))}`;
+
+    picker.classList.add('hidden');
+    playReactionSound(key);
+  }
+
+  // Wire picker buttons (once)
+  picker.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (pickerCurrentPost && pickerCurrentBtn) {
+        selectReaction(btn.dataset.reaction, pickerCurrentPost, pickerCurrentBtn);
+      }
+    });
+  });
+  picker.addEventListener('mouseenter', () => clearTimeout(pickerHideTimer));
+  picker.addEventListener('mouseleave', hidePicker);
+
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   function formatCount(n) {
@@ -232,6 +348,7 @@
 
   // Connect buttons in modal — satirical behavior
   document.getElementById('modal-connect-btn').addEventListener('click', function () {
+    playConnectSound();
     this.textContent = 'Pending ✓';
     this.style.background = 'var(--linkedin-blue-light)';
     this.disabled = true;
@@ -287,9 +404,9 @@
       </div>
 
       <div class="post-actions">
-        <button class="action-btn like-btn" data-reaction="like">
-          <svg viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.3a2 2 0 0 0 2-1.7l1.4-9a2 2 0 0 0-2-2.3H14z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
-          Like
+        <button class="action-btn like-btn">
+          <svg class="reaction-svg" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.3a2 2 0 0 0 2-1.7l1.4-9a2 2 0 0 0-2-2.3H14z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span class="reaction-emoji-label"></span><span class="reaction-text-label">Like</span>
         </button>
         <button class="action-btn comment-btn">
           <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
@@ -323,9 +440,21 @@
       </div>
     `;
 
-    // Like
+    // Like — hover shows picker after 400ms, direct click quick-Likes
     const likeBtn = card.querySelector('.like-btn');
-    likeBtn.addEventListener('click', () => toggleLike(likeBtn, post));
+    post._userReaction = null;
+    let hoverTimer;
+    likeBtn.addEventListener('mouseenter', () => {
+      hoverTimer = setTimeout(() => showPicker(likeBtn, post), 400);
+    });
+    likeBtn.addEventListener('mouseleave', () => {
+      clearTimeout(hoverTimer);
+      hidePicker();
+    });
+    likeBtn.addEventListener('click', () => {
+      clearTimeout(hoverTimer);
+      selectReaction('like', post, likeBtn);
+    });
 
     // Comment toggle
     const commentBtn = card.querySelector('.comment-btn');
@@ -374,17 +503,6 @@
   }
 
   // ── Interaction handlers ─────────────────────────────────────────────────
-
-  function toggleLike(btn, post) {
-    btn.classList.toggle('active');
-    const delta = btn.classList.contains('active') ? 1 : -1;
-    post.reactions.like += delta;
-    const summaryEl = btn.closest('.post-card').querySelector('.reactions-count');
-    summaryEl.innerHTML = `
-      <span class="reaction-emojis">${topReactionEmojis(post.reactions)}</span>
-      ${formatCount(totalReactions(post.reactions))}
-    `;
-  }
 
   function toggleSeeMore(btn, card) {
     const textEl = card.querySelector('.post-text');
