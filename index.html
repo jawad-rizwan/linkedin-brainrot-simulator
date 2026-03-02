@@ -156,6 +156,51 @@
 
   </main>
 
+  <!-- ── Profile Modal ───────────────────────────────────────────────────── -->
+  <div id="profile-modal" class="profile-modal hidden">
+    <div id="modal-backdrop" class="modal-backdrop"></div>
+    <div class="modal-content">
+      <button id="modal-close-btn" class="modal-close" aria-label="Close">✕</button>
+      <div class="modal-cover">
+        <img id="modal-cover-img" alt="">
+      </div>
+      <div class="modal-body">
+        <div class="modal-top-row">
+          <img id="modal-avatar" class="modal-avatar" alt="">
+          <div class="modal-actions">
+            <button id="modal-connect-btn" class="modal-connect-btn">Connect</button>
+            <button id="modal-message-btn" class="modal-message-btn">Message</button>
+          </div>
+        </div>
+        <div class="modal-header-info">
+          <h2 id="modal-name"></h2>
+          <p id="modal-title" class="modal-subtitle"></p>
+          <p id="modal-connections" class="modal-connections"></p>
+        </div>
+        <section class="modal-section">
+          <h3>About</h3>
+          <p id="modal-about" class="modal-about-text"></p>
+        </section>
+        <section class="modal-section" id="modal-experience-section">
+          <h3>Experience</h3>
+          <div id="modal-experience"></div>
+        </section>
+        <section class="modal-section" id="modal-education-section">
+          <h3>Education</h3>
+          <div id="modal-education"></div>
+        </section>
+        <section class="modal-section">
+          <h3>Skills</h3>
+          <div id="modal-skills"></div>
+        </section>
+        <section class="modal-section">
+          <h3>Featured</h3>
+          <div id="modal-featured" class="modal-featured-text"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
   <script src="posts.js"></script>
   <script src="app.js"></script>
 </body>

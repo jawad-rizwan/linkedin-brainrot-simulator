@@ -4,13 +4,78 @@
   const feed = document.getElementById('feed');
   const sentinel = document.getElementById('scroll-sentinel');
   const loadingEl = document.getElementById('loading');
+  const profileModal = document.getElementById('profile-modal');
 
-  // Work through POSTS in order, then loop EXTRA_POSTS randomly
   let postQueue = [...POSTS];
   let extraQueue = [...EXTRA_POSTS];
   let isLoading = false;
 
-  // ── Helpers ─────────────────────────────────────────────────────────────
+  // ── Bot pool for satirical auto-replies ──────────────────────────────────
+
+  const BOT_POOL = [
+    {
+      name: "LinkedIn Algorithm",
+      avatar: "https://i.pravatar.cc/32?img=17",
+      replies: [
+        "This comment is performing well. Consider upgrading to Premium to see who engaged with it.",
+        "Your engagement is up 300% this week. The brainrot is working.",
+        "Comment detected. Distributing to 47 additional connections who may find it synergistic.",
+        "Excellent comment. We are boosting it to people who didn't ask to see it."
+      ]
+    },
+    {
+      name: "Motivational Kevin 🔥",
+      avatar: "https://i.pravatar.cc/32?img=35",
+      replies: [
+        "This is EXACTLY what I needed today. Screenshotting. Sending to my accountability group. 🔥🔥",
+        "Wow. Just WOW. I've already added this to my vision board.",
+        "You SAID it. Nobody else was willing to say it. You said it. 💪",
+        "Commenting so I can find this later. This is going in the newsletter."
+      ]
+    },
+    {
+      name: "Passive-Aggressive HR",
+      avatar: "https://i.pravatar.cc/32?img=49",
+      replies: [
+        "Friendly reminder that all comments are monitored and may be used in your performance review.",
+        "We'd love to connect you with our Chief Culture Officer about this comment.",
+        "Have you considered submitting this through our official feedback portal instead?",
+        "Great comment! We're looking into whether this aligns with our core values."
+      ]
+    },
+    {
+      name: "Course Seller Carla",
+      avatar: "https://i.pravatar.cc/32?img=32",
+      replies: [
+        "I have a free masterclass on exactly this. DM me the word COMMENT to receive it.",
+        "This is why I built my 6-week program. Link in bio. Use code COMMENT for 10% off.",
+        "I made a Notion template about this. 47 pages. Free with email signup.",
+        "Have you thought about turning this comment into a course? I coach people on that. $997."
+      ]
+    },
+    {
+      name: "Gary Vee Burner 🐝",
+      avatar: "https://i.pravatar.cc/32?img=53",
+      replies: [
+        "CONTENT. IS. KING. 👑 Document this moment.",
+        "Jab jab jab RIGHT HOOK. That's what this comment is.",
+        "Document don't create. Or create don't document. Honestly both.",
+        "In 2031 everyone will wish they had commented more. You're early."
+      ]
+    },
+    {
+      name: "Humble Brad 🙏",
+      avatar: "https://i.pravatar.cc/32?img=18",
+      replies: [
+        "Incredibly humbled to see this comment. You've given me so much to think about. 🙏",
+        "I don't say this lightly but: this comment has fundamentally changed how I operate.",
+        "Saved. Shared. Printed. Laminated. Thank you for your service.",
+        "Just when I think I've seen everything LinkedIn has to offer, you comment this. 🙏🙏🙏"
+      ]
+    }
+  ];
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
 
   function formatCount(n) {
     if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
@@ -31,6 +96,150 @@
     return Object.values(reactions).reduce((a, b) => a + b, 0);
   }
 
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function buildCommentEl(author, avatarUrl, text, isNew) {
+    const el = document.createElement('div');
+    el.className = 'comment' + (isNew ? ' comment-new' : '');
+    el.innerHTML = `
+      <img class="comment-avatar" src="${avatarUrl}" alt="${escapeHtml(author)}" loading="lazy"
+           onerror="this.src='https://i.pravatar.cc/32?img=${Math.floor(Math.random() * 70) + 1}'">
+      <div class="comment-bubble">
+        <div class="comment-author">${escapeHtml(author)}</div>
+        <div class="comment-text">${escapeHtml(text)}</div>
+      </div>
+    `;
+    if (isNew) {
+      el.addEventListener('animationend', () => el.classList.remove('comment-new'), { once: true });
+    }
+    return el;
+  }
+
+  // ── Comment system ───────────────────────────────────────────────────────
+
+  function addComment(card, post, text) {
+    const section = card.querySelector('.comments-section');
+    const writeRow = card.querySelector('.write-comment');
+
+    const commentEl = buildCommentEl('You, Probably', 'https://i.pravatar.cc/32?img=1', text, true);
+    section.insertBefore(commentEl, writeRow);
+
+    post.comments.push({ author: 'You, Probably', text });
+    updateCommentCount(card, post);
+
+    card.querySelector('.comment-input').value = '';
+
+    const delay = 1200 + Math.random() * 800;
+    setTimeout(() => addBotReply(card, post), delay);
+  }
+
+  function addBotReply(card, post) {
+    const section = card.querySelector('.comments-section');
+    const writeRow = card.querySelector('.write-comment');
+
+    const bot = BOT_POOL[Math.floor(Math.random() * BOT_POOL.length)];
+    const reply = bot.replies[Math.floor(Math.random() * bot.replies.length)];
+
+    const commentEl = buildCommentEl(bot.name, bot.avatar, reply, true);
+    section.insertBefore(commentEl, writeRow);
+
+    post.comments.push({ author: bot.name, text: reply });
+    updateCommentCount(card, post);
+  }
+
+  function updateCommentCount(card, post) {
+    const countEl = card.querySelector('.comments-count');
+    const n = post.comments.length;
+    countEl.textContent = `${n} comment${n !== 1 ? 's' : ''}`;
+  }
+
+  // ── Profile modal ────────────────────────────────────────────────────────
+
+  function openProfile(postId) {
+    const profile = PROFILES[postId];
+    const post = [...POSTS, ...EXTRA_POSTS].find(p => p.id === postId);
+    if (!post) return;
+
+    if (!profile) {
+      document.getElementById('modal-cover-img').src = 'https://picsum.photos/seed/default/800/200';
+      document.getElementById('modal-avatar').src = post.avatarUrl;
+      document.getElementById('modal-name').textContent = post.author;
+      document.getElementById('modal-title').textContent = post.title;
+      document.getElementById('modal-connections').textContent = '500+ connections';
+      document.getElementById('modal-about').textContent = 'This profile is currently being optimized for the algorithm. Please check back after the next content drop.';
+      document.getElementById('modal-experience').innerHTML = '<p style="color:var(--text-secondary);font-size:13px;">Experience data is being strategically curated. Stand by.</p>';
+      document.getElementById('modal-skills').innerHTML = '<span class="skill-chip">Synergy</span><span class="skill-chip">Growth</span><span class="skill-chip">Disruption</span>';
+      document.getElementById('modal-featured').textContent = 'Featured content loading... (sponsored by BrainBust®)';
+      profileModal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+      return;
+    }
+
+    document.getElementById('modal-cover-img').src = profile.coverUrl;
+    document.getElementById('modal-avatar').src = post.avatarUrl;
+    document.getElementById('modal-name').textContent = post.author;
+    document.getElementById('modal-title').textContent = post.title;
+    document.getElementById('modal-connections').textContent = profile.connections + ' connections';
+    document.getElementById('modal-about').textContent = profile.about;
+
+    const expEl = document.getElementById('modal-experience');
+    expEl.innerHTML = profile.experience.map(e => `
+      <div class="exp-item">
+        <div class="exp-title">${escapeHtml(e.title)}</div>
+        <div class="exp-company">${escapeHtml(e.company)} · ${escapeHtml(e.duration)}</div>
+        <div class="exp-desc">${escapeHtml(e.desc)}</div>
+      </div>
+    `).join('');
+
+    const skillsEl = document.getElementById('modal-skills');
+    skillsEl.innerHTML = profile.skills.map(s => `<span class="skill-chip">${escapeHtml(s)}</span>`).join('');
+
+    document.getElementById('modal-featured').textContent = profile.featured;
+
+    // Education section
+    const eduSection = document.getElementById('modal-education-section');
+    if (profile.education && profile.education.length > 0) {
+      document.getElementById('modal-education').innerHTML = profile.education.map(e => `
+        <div class="exp-item">
+          <div class="exp-title">${escapeHtml(e.school)}</div>
+          <div class="exp-company">${escapeHtml(e.degree)} · ${escapeHtml(e.year)}</div>
+        </div>
+      `).join('');
+      eduSection.style.display = '';
+    } else {
+      eduSection.style.display = 'none';
+    }
+
+    profileModal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeProfile() {
+    profileModal.classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  // Wire up modal close targets
+  document.getElementById('modal-close-btn').addEventListener('click', closeProfile);
+  document.getElementById('modal-backdrop').addEventListener('click', closeProfile);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeProfile(); });
+
+  // Connect buttons in modal — satirical behavior
+  document.getElementById('modal-connect-btn').addEventListener('click', function () {
+    this.textContent = 'Pending ✓';
+    this.style.background = 'var(--linkedin-blue-light)';
+    this.disabled = true;
+  });
+  document.getElementById('modal-message-btn').addEventListener('click', function () {
+    alert('Your message has been placed in a queue behind 4,000 other messages. Estimated response time: never. Consider upgrading to Premium.');
+  });
+
   // ── Render a single post ─────────────────────────────────────────────────
 
   function renderPost(post) {
@@ -40,7 +249,6 @@
 
     const totalRx = totalReactions(post.reactions);
     const truncate = post.content.length > 250;
-    const displayText = truncate ? post.content : post.content;
 
     const isL5 = post.absurdityLevel === 5;
     const thoughtLeaderBadge = isL5
@@ -52,14 +260,14 @@
 
     card.innerHTML = `
       <div class="post-header">
-        <img class="post-avatar" src="${post.avatarUrl}" alt="${post.author}" loading="lazy"
-             onerror="this.src='https://i.pravatar.cc/48?img=${(post.id % 70) + 1}'">
+        <img class="post-avatar" src="${post.avatarUrl}" alt="${escapeHtml(post.author)}" loading="lazy"
+             onerror="this.src='https://i.pravatar.cc/48?img=${(post.id % 70) + 1}'" style="cursor:pointer">
         <div class="post-meta">
-          <div class="post-author">
-            ${post.author}${thoughtLeaderBadge} ${degreeLabel}
+          <div class="post-author" style="cursor:pointer">
+            ${escapeHtml(post.author)}${thoughtLeaderBadge} ${degreeLabel}
           </div>
-          <div class="post-title">${post.title}</div>
-          <div class="post-time">${post.timeAgo} · 🌐</div>
+          <div class="post-title">${escapeHtml(post.title)}</div>
+          <div class="post-time">${escapeHtml(post.timeAgo)} · 🌐</div>
         </div>
         ${post.isSponsored ? '' : `<button class="follow-btn">+ Follow</button>`}
       </div>
@@ -100,8 +308,8 @@
       <div class="comments-section">
         ${post.comments.map(c => `
           <div class="comment">
-            <img class="comment-avatar" src="${c.avatarUrl}" alt="${c.author}" loading="lazy"
-                 onerror="this.src='https://i.pravatar.cc/32?img=${Math.floor(Math.random()*70)+1}'">
+            <img class="comment-avatar" src="${c.avatarUrl}" alt="${escapeHtml(c.author)}" loading="lazy"
+                 onerror="this.src='https://i.pravatar.cc/32?img=${Math.floor(Math.random() * 70) + 1}'">
             <div class="comment-bubble">
               <div class="comment-author">${escapeHtml(c.author)}</div>
               <div class="comment-text">${escapeHtml(c.text)}</div>
@@ -110,19 +318,23 @@
         `).join('')}
         <div class="write-comment">
           <img src="https://i.pravatar.cc/32?img=1" alt="You">
-          <input type="text" placeholder="Add a comment…" onkeydown="if(event.key==='Enter'){alert('Your comment has been reviewed by The Algorithm and deemed insufficiently engaging. Try again with more buzzwords.');}">
+          <input type="text" class="comment-input" placeholder="Add a comment… (press Enter)">
         </div>
       </div>
     `;
 
-    // Attach events
+    // Like
     const likeBtn = card.querySelector('.like-btn');
     likeBtn.addEventListener('click', () => toggleLike(likeBtn, post));
 
+    // Comment toggle
     const commentBtn = card.querySelector('.comment-btn');
     commentBtn.addEventListener('click', () => {
       const section = card.querySelector('.comments-section');
       section.classList.toggle('open');
+      if (section.classList.contains('open')) {
+        card.querySelector('.comment-input').focus();
+      }
     });
 
     const commentsCount = card.querySelector('.comments-count');
@@ -131,17 +343,32 @@
       section.classList.toggle('open');
     });
 
+    // Comment input — Enter to submit
+    const commentInput = card.querySelector('.comment-input');
+    commentInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && commentInput.value.trim()) {
+        addComment(card, post, commentInput.value.trim());
+      }
+    });
+
+    // See more
     const seeMoreBtn = card.querySelector('.see-more-btn');
     if (seeMoreBtn) {
       seeMoreBtn.addEventListener('click', () => toggleSeeMore(seeMoreBtn, card));
     }
 
+    // Repost
     const repostBtn = card.querySelector('.repost-btn');
     repostBtn.addEventListener('click', () => {
       repostBtn.classList.toggle('active');
-      const txt = repostBtn.classList.contains('active') ? '✓ Reposted' : 'Repost';
-      repostBtn.lastChild.textContent = ' ' + txt;
+      repostBtn.lastChild.textContent = repostBtn.classList.contains('active') ? ' ✓ Reposted' : ' Repost';
     });
+
+    // Profile open — avatar and author name
+    const avatarEl = card.querySelector('.post-avatar');
+    const authorEl = card.querySelector('.post-author');
+    avatarEl.addEventListener('click', () => openProfile(post.id));
+    authorEl.addEventListener('click', () => openProfile(post.id));
 
     return card;
   }
@@ -150,14 +377,12 @@
 
   function toggleLike(btn, post) {
     btn.classList.toggle('active');
-    const summaryEl = btn.closest('.post-card').querySelector('.reactions-count');
-    const wasActive = !btn.classList.contains('active'); // just toggled, so invert
     const delta = btn.classList.contains('active') ? 1 : -1;
     post.reactions.like += delta;
-    const total = totalReactions(post.reactions);
+    const summaryEl = btn.closest('.post-card').querySelector('.reactions-count');
     summaryEl.innerHTML = `
       <span class="reaction-emojis">${topReactionEmojis(post.reactions)}</span>
-      ${formatCount(total)}
+      ${formatCount(totalReactions(post.reactions))}
     `;
   }
 
@@ -172,14 +397,6 @@
     }
   }
 
-  function escapeHtml(str) {
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
-
   // ── Feed loading ─────────────────────────────────────────────────────────
 
   function nextPosts(count) {
@@ -188,7 +405,6 @@
       if (postQueue.length > 0) {
         posts.push(postQueue.shift());
       } else {
-        // Cycle through extra posts randomly
         if (extraQueue.length === 0) extraQueue = [...EXTRA_POSTS];
         const idx = Math.floor(Math.random() * extraQueue.length);
         const p = { ...extraQueue.splice(idx, 1)[0], id: Date.now() + i };
@@ -202,7 +418,6 @@
     posts.forEach(post => {
       const card = renderPost(post);
       feed.appendChild(card);
-      // Small entrance animation
       card.style.opacity = '0';
       card.style.transform = 'translateY(8px)';
       requestAnimationFrame(() => {
@@ -217,7 +432,6 @@
     if (isLoading) return;
     isLoading = true;
     loadingEl.classList.add('visible');
-
     setTimeout(() => {
       appendPosts(nextPosts(3));
       loadingEl.classList.remove('visible');
@@ -225,21 +439,15 @@
     }, 600 + Math.random() * 400);
   }
 
-  // ── Infinite scroll via IntersectionObserver ─────────────────────────────
+  // ── Infinite scroll ───────────────────────────────────────────────────────
 
   const observer = new IntersectionObserver(
-    (entries) => {
-      if (entries[0].isIntersecting) loadMorePosts();
-    },
+    (entries) => { if (entries[0].isIntersecting) loadMorePosts(); },
     { rootMargin: '200px' }
   );
   observer.observe(sentinel);
 
-  // ── Init ─────────────────────────────────────────────────────────────────
+  // ── Init ──────────────────────────────────────────────────────────────────
 
-  function init() {
-    appendPosts(nextPosts(5));
-  }
-
-  init();
+  appendPosts(nextPosts(5));
 })();
